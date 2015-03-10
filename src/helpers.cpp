@@ -52,6 +52,47 @@ double getTime()
 }
 #endif
 
+#ifdef DEBUG_HELPERS
+#undef DEBUG_HELPERS
+#endif
+#define DEBUG_HELPERS
+
+#ifdef DEBUG_HELPERS
+#define printDBG(msg) std::cerr << "[helpers.c] " << msg << std::endl;
+#define write(msg) std::cerr << msg;
+#else
+#define printDBG(msg);
+#endif
+
+
+void run_system_command(std::string cmd_str)
+{
+    printDBG("+ ----- RUNNING COMMAND ----- ")
+    printDBG(cmd_str);
+    int retcode = system(cmd_str.c_str());
+    printDBG(" retcode = " << retcode)
+    printDBG("L _______ FINISHED RUNNING COMMAND _______ ")
+    if (retcode != 0)
+    {
+        printDBG("FAILURE")
+        exit(1);
+    }
+}
+
+
+void make_2d_gauss_patch_01(int rows, int cols, float sigma0, float sigma1, cv::Mat& gauss_weights)
+{
+    double d0_max, d0_min, d1_max, d1_min;
+    cv::Mat gauss_kernel_d0 = cv::getGaussianKernel(rows, sigma0, CV_32F);
+    cv::Mat gauss_kernel_d1 = cv::getGaussianKernel(cols, sigma1, CV_32F);
+    cv::minMaxLoc(gauss_kernel_d0, &d0_min, &d0_max);
+    cv::minMaxLoc(gauss_kernel_d1, &d1_min, &d1_max);
+    gauss_kernel_d0 = gauss_kernel_d0.mul(1.0f / d0_max);
+    gauss_kernel_d1 = gauss_kernel_d1.mul(1.0f / d1_max);
+    //cv::Mat gauss_weights = gauss_kernel_d1.dot(gauss_kernel_d0.t());
+    gauss_weights = gauss_kernel_d1 * gauss_kernel_d0.t();
+}
+
 
 template <typename ValueType>
 void swap(ValueType *a, ValueType *b)
@@ -226,7 +267,7 @@ void computeCircularGaussMask(Mat &mask)
 }
 
 
-void invSqrt(float &a, float &b, float &c, float &l1, float &l2)
+void invSqrt(float &a, float &b, float &c, float &eigval1, float &eigval2)
 {
     // Inverse matrix square root
     // if Z = V.dot(V)
@@ -260,16 +301,16 @@ void invSqrt(float &a, float &b, float &c, float &l1, float &l2)
     d = sqrt(x * z);
     x /= d;
     z /= d;
-    // let l1 be the greater eigenvalue
+    // let eigval1 be the greater eigenvalue
     if(x < z)
     {
-        l1 = float(z);
-        l2 = float(x);
+        eigval1 = float(z);
+        eigval2 = float(x);
     }
     else
     {
-        l1 = float(x);
-        l2 = float(z);
+        eigval1 = float(x);
+        eigval2 = float(z);
     }
     // output square root
     a = float(r * r * x + t * t * z);
@@ -278,7 +319,7 @@ void invSqrt(float &a, float &b, float &c, float &l1, float &l2)
 }
 
 
-bool getEigenvalues(float a, float b, float c, float d, float &l1, float &l2)
+bool getEigenvalues(float a, float b, float c, float d, float &eigval1, float &eigval2)
 {
     float trace = a + d;
     float delta1 = (trace * trace - 4 * (a * d - b * c));
@@ -288,8 +329,8 @@ bool getEigenvalues(float a, float b, float c, float d, float &l1, float &l2)
     }
     float delta = sqrt(delta1);
 
-    l1 = (trace + delta) / 2.0f;
-    l2 = (trace - delta) / 2.0f;
+    eigval1 = (trace + delta) / 2.0f;
+    eigval2 = (trace - delta) / 2.0f;
     return true;
 }
 
@@ -298,6 +339,9 @@ bool getEigenvalues(float a, float b, float c, float d, float &l1, float &l2)
 bool interpolateCheckBorders(const Mat &im, float ofsx, float ofsy,
                              float a11, float a12, float a21, float a22, const Mat &res)
 {
+    /*
+     Simply returns true or false, does not affect state
+     */
     // does not do interpolation, just checks if we can
     const int width  = im.cols - 2;
     const int height = im.rows - 2;
@@ -329,10 +373,20 @@ bool interpolateCheckBorders(const Mat &im, float ofsx, float ofsy,
 bool interpolate(const Mat &im, float ofsx, float ofsy,
                  float a11, float a12, float a21, float a22, Mat &res)
 {
-    // extracts a patch from im, corresponding to the keypoint
-    // (ofsx, ofsy, a11, a12, a21, a22)
-    // outputs the value in res
-    //
+    /*
+    extracts a patch from im, corresponding to the keypoint using bilinear interpolation
+
+    Args:
+        im - image to extract patch from
+        (ofsx, ofsy, a11, a12, a21, a22) - ellipse paramaters of patch to extract
+
+    OutVar:
+         res - patch of image im found using using elliptical shape
+
+    Returns:
+        bool: True if the patch was on the image boundary
+
+    */
     bool ret = false;
     // input size (-1 for the safe bilinear interpolation)
     const int width = im.cols - 1;
