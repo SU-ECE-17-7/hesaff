@@ -153,13 +153,16 @@ struct AffineHessianDetector : public HessianDetector, AffineShape, HessianKeypo
 
         int detect()
         {
+            printf("<> detectA IN\n");
             // Reset counters
             this->detectPyramidKeypoints(this->image);
+            printf("<> detectA OUT\n");
             return this->keys.size();
         }
 
         void exportArrays(int nKpts, float *kpts, uint8 *desc)
         {
+        printf("<> inner AffineHessianDetector.exportArrays IN\n");
             // Exports keypoints and descriptors into preallocated numpy arrays
             for (size_t fx=0; fx < nKpts; fx++)
             {
@@ -199,10 +202,16 @@ struct AffineHessianDetector : public HessianDetector, AffineShape, HessianKeypo
                     desc[rowd + ix] = uint8(k.desc[ix]);
                 }
             }
+        
+        printf("nKpts: %d\n", nKpts);
+        printf("&kpts: %d\n", kpts);
+        printf("&desc: %d\n", desc);
+        printf("<> inner AffineHessianDetector.exportArrays OUT\n");
         }
 
         void write_features(char* img_fpath)
         {
+            printf("<> write_features IN\n");
             // Dump keypoints to disk in text format
             char suffix[] = ".hesaff.sift";
             int len = strlen(img_fpath)+strlen(suffix)+1;
@@ -218,10 +227,12 @@ struct AffineHessianDetector : public HessianDetector, AffineShape, HessianKeypo
             #ifdef WIN32
             delete[] out_fpath;
             #endif
+            printf("<> write_features OUT\n");
         }
 
         void exportKeypoints(std::ostream &out)
         {
+            printf("<> exportKeypoints IN\n");
             /*Writes text keypoints in the invE format to a stdout stream
              * [iE_a, iE_b]
              * [iE_b, iE_d]
@@ -277,6 +288,7 @@ struct AffineHessianDetector : public HessianDetector, AffineShape, HessianKeypo
                 }
                 out << std::endl;
             }
+            printf("<> exportKeypoints OUT\n");
         }
 
 
@@ -284,12 +296,15 @@ struct AffineHessianDetector : public HessianDetector, AffineShape, HessianKeypo
                 float s, float pixelDistance,
                 int type, float response)
         {
+            //printf("<> onHessianKeypointDetected IN\n");
             // A circular keypoint is detected. Adpat its shape to an ellipse
             findAffineShape(blur, x, y, s, pixelDistance, type, response);
+            //printf("<> onHessianKeypointDetected OUT\n");
         }
 
         void extractDesc(int nKpts, float* kpts, uint8* desc)
         {
+            printf("<> extractDesc IN\n");
             // Extract descriptors from user specified keypoints
             float x, y, iv11, iv12, iv21, iv22;
             float sc;
@@ -341,6 +356,7 @@ struct AffineHessianDetector : public HessianDetector, AffineShape, HessianKeypo
                     printDBG("Failure!");
                 }
             }
+            printf("<> extractDesc OUT\n");
         }
 
         //------------------------------------------------------------
@@ -364,6 +380,7 @@ struct AffineHessianDetector : public HessianDetector, AffineShape, HessianKeypo
                 int type, float response,
                 int iters)
         {
+            //printf("<> onAffineShapeFound IN\n");
             // type can be one of:
             //HESSIAN_DARK   = 0,
             //HESSIAN_BRIGHT = 1,
@@ -400,6 +417,7 @@ struct AffineHessianDetector : public HessianDetector, AffineShape, HessianKeypo
                     this->populateDescriptor(k.desc, 0);
                 }
             }
+            //printf("<> onAffineShapeFound OUT\n");
         }
         // END void onAffineShapeFound
         //------------------------------------------------------------
@@ -411,11 +429,13 @@ struct AffineHessianDetector : public HessianDetector, AffineShape, HessianKeypo
 
         void populateDescriptor(uint8* desc, size_t offst)
         {
+            //printf("<> populateDescriptor IN\n");
             this->sift.computeSiftDescriptor(this->patch);
             for (int ix=0; ix < DESC_DIM; ix++)
             {
                 desc[offst + ix] = (uint8) sift.vec[ix];  // populate outvar
             }
+            //printf("<> populateDescriptor OUT\n");
         }
 
         void DBG_patch()
@@ -427,6 +447,7 @@ struct AffineHessianDetector : public HessianDetector, AffineShape, HessianKeypo
 
         void DBG_keypoint(float* kpts, int rowk)
         {
+            printf("<> DBG_keypoint IN\n");   
             float x, y, iv11, iv12, iv21, iv22, ori;
             x = kpts[rowk + 0];
             y = kpts[rowk + 1];
@@ -442,6 +463,7 @@ struct AffineHessianDetector : public HessianDetector, AffineShape, HessianKeypo
             printDBG("|         (" << iv21 << ", " << iv22 << ")] ");
             printDBG("|  ori = " << ori);
             printDBG("L___");
+            printf("<> DBG_keypoint OUT\n");
         }
 
 
@@ -465,9 +487,11 @@ extern "C" {
 
     PYHESAFF int detect(AffineHessianDetector* detector)
     {
+        printf("<> detect IN\n");
         printDBG("detector->detect");
         int nKpts = detector->detect();
         printDBG("nKpts = " << nKpts);
+        printf("<> detect OUT\n");
         return nKpts;
     }
 
@@ -507,6 +531,7 @@ extern "C" {
             float scale_max,
             bool rotation_invariance)
             {
+                printf("<> new_hesaff_from_params IN\n");
                 printDBG("making detector for " << img_fpath);
                 printDBG("make hesaff. img_fpath = " << img_fpath);
                 // Read in image and convert to uint8
@@ -571,12 +596,14 @@ extern "C" {
                 printDBG("affShapeParams.rotation_invariance  = " << rotation_invariance);
                 // Create detector
                 AffineHessianDetector* detector = new AffineHessianDetector(image, pyrParams, affShapeParams, siftParams);
+                printf("<> new_hesaff_from_params OUT\n");
                 return detector;
             }
 
     // new hessian affine detector WRAPPER
     PYHESAFF AffineHessianDetector* new_hesaff(char* img_fpath)
     {
+        printf("<> new_hesaff IN\n");
         // Pyramid Params
         int   numberOfScales = 3;
         float threshold = 16.0f / 3.0f;
@@ -605,6 +632,7 @@ extern "C" {
                 maxIterations, convergenceThreshold, smmWindowSize, mrSize,
                 spatialBins, orientationBins, maxBinValue, initialSigma, patchSize,
                 scale_min, scale_max, rotation_invariance);
+        printf("<> new_hesaff OUT\n");        
         return detector;
     }
 
@@ -612,30 +640,42 @@ extern "C" {
     PYHESAFF void extractDesc(AffineHessianDetector* detector,
             int nKpts, float* kpts, uint8* desc)
     {
+        printf("<> extractDesc IN\n");
         printDBG("detector->extractDesc");
         detector->extractDesc(nKpts, kpts, desc);
         printDBG("extracted nKpts = " << nKpts);
+        printf("<> extractDesc OUT\n");        
     }
 
     // export current detections to numpy arrays
     PYHESAFF void exportArrays(AffineHessianDetector* detector,
             int nKpts, float *kpts, uint8 *desc)
     {
+        printf("<> AffineHessianDetector.exportArrays IN\n");
         printDBG("detector->exportArrays(" << nKpts << ")");
         //printDBG("detector->exportArrays kpts[0]" << kpts[0] << ")");
         //printDBG("detector->exportArrays desc[0]" << (int) desc[0] << ")");
+        printf("nKpts: %d\n", nKpts);
+        printf("&kpts: %d\n", kpts);
+        printf("&desc: %d\n", desc);
         detector->exportArrays(nKpts, kpts, desc);
+        printf("nKpts: %d\n", nKpts);
+        printf("&kpts: %d\n", kpts);
+        printf("&desc: %d\n", desc);
         //printDBG("detector->exportArrays kpts[0]" << kpts[0] << ")");
         //printDBG("detector->exportArrays desc[0]" << (int) desc[0] << ")");
         printDBG("FINISHED detector->exportArrays");
+        printf("<> AffineHessianDetector.exportArrays OUT\n");
     }
 
     // dump current detections to disk
     PYHESAFF void writeFeatures(AffineHessianDetector* detector,
             char* img_fpath)
     {
+        printf("<> writeFeatures IN\n");
         printDBG("detector->write_features");
         detector->write_features(img_fpath);
+        printf("<> writeFeatures OUT\n");        
     }
 
 #ifdef __cplusplus
@@ -650,6 +690,7 @@ extern "C" {
 // * program entry point for command line use if we build the executable
 int main(int argc, char **argv)
 {
+    printf("<><><><><><><><><><><><>\nEntered hesaff.cpp at main\n<><><><><><><><><><><><>\n");
     if (argc>1)
     {
         printDBG("main()");
@@ -663,4 +704,5 @@ int main(int argc, char **argv)
     {
         printf("\nUsage: ell_desc image_name.png kpts_file.txt\nDescribes elliptical keypoints (with gravity vector) given in kpts_file.txt using a SIFT descriptor.\n\n");
     }
+    printf("Exiting hesaff.cpp at main\n");    
 }

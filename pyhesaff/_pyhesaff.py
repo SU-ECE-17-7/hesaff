@@ -107,7 +107,7 @@ def _alloc_desc(nKpts):
     desc = np.empty((nKpts, DESC_DIM), desc_dtype)
     return desc
 
-
+''' This is used for exportArrays in hesaff.cpp '''
 def _allocate_kpts_and_desc(nKpts):
     kpts = np.empty((nKpts, KPTS_DIM), kpts_dtype)
     desc = _alloc_desc(nKpts)
@@ -167,6 +167,7 @@ def detect_kpts(img_fpath,
     kpts, desc = _allocate_kpts_and_desc(nKpts)  # Allocate arrays
     if __DEBUG__:
         print('[hes] export')
+    ''' exportArray in hesaff.cpp uses kpts and desc preallocated by _allocate_kpts_and_desc'''
     HESAFF_CLIB.exportArrays(hesaff_ptr, nKpts, kpts, desc)  # Populate arrays
     if use_adaptive_scale:  # Adapt scale if requested
         #print('Adapting Scale')
